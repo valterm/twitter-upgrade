@@ -1,0 +1,74 @@
+name: Release extension
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-extension
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Read version and check for an existing release
+        id: version
+        run: |
+          version=$(jq -er '.version | select(type == "string")' extension/manifest.json)
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+            echo "::error::Invalid extension manifest version: $version"
+            exit 1
+          fi
+          exists=$(gh api --paginate "repos/$GH_REPO/releases" |
+            jq -s --arg version "$version" 'add | any(.tag_name == $version)')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "exists=$exists" >> "$GITHUB_OUTPUT"
+
+      - name: Package signed extension
+        if: steps.version.outputs.exists == 'false'
+        env:
+          EXTENSION_PRIVATE_KEY: ${{ secrets.EXTENSION_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [[ -z "$EXTENSION_PRIVATE_KEY" ]]; then
+            echo "::error::Set the EXTENSION_PRIVATE_KEY repository secret to the contents of your extension.pem file."
+            exit 1
+          fi
+          key_path="$RUNNER_TEMP/extension.pem"
+          trap 'rm -f "$key_path"' EXIT
+          umask 077
+          printf '%s\n' "$EXTENSION_PRIVATE_KEY" > "$key_path"
+          unset EXTENSION_PRIVATE_KEY
+          google-chrome --headless --no-sandbox \
+            --user-data-dir="$RUNNER_TEMP/chrome-pack-profile" \
+            --pack-extension="$GITHUB_WORKSPACE/extension" \
+            --pack-extension-key="$key_path"
+          test -s "$GITHUB_WORKSPACE/extension.crx"
+          mkdir -p dist
+          mv "$GITHUB_WORKSPACE/extension.crx" "dist/twitter-upgrade-$VERSION.crx"
+
+      - name: Create release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" "dist/twitter-upgrade-$VERSION.crx" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes

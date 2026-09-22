@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Twitter Upgrade",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Make your twitter experience less Elonified.",
   "icons": {
     "16": "assets/pigeon-16.png",
