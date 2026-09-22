@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Twitter Upgrade",
+  "version": "1.0.0",
+  "description": "Make your twitter experience less Elonified.",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_title": "Twitter Upgrade",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://www.x.com/*",
+        "https://twitter.com/*",
+        "https://www.twitter.com/*",
+        "https://mobile.twitter.com/*"
+      ],
+      "js": [
+        "media.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://www.x.com/*",
+        "https://twitter.com/*",
+        "https://www.twitter.com/*",
+        "https://mobile.twitter.com/*"
+      ],
+      "js": [
+        "defaults.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
